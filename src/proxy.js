@@ -57,6 +57,6 @@ var options = {
 };
 
 // create the proxy (without context)
-const proxyApp = proxy(options);
-// var proxyApp = proxy({target: 'https://www.bmw.ie', changeOrigin: true});
+// const proxyApp = proxy(options);
+var proxyApp = proxy({target: 'https://www.bmw.de', changeOrigin: true});
 module.exports = proxyApp;

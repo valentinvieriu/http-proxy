@@ -12,6 +12,7 @@
   "dependencies": {
     "express": "^4.16.3",
     "http-proxy-middleware": "^0.18.0",
+    "spdy": "^3.4.7",
     "zlib": "^1.0.5"
   },
   "devDependencies": {
