@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const http = require('http');
 const spdy = require('spdy');
 const path = require('path');
@@ -8,6 +9,7 @@ const proxy = require('./proxy');
 
 const rootPath = process.cwd();
 const app = express();
+app.use(compression());
 app.use(express.static(path.join(rootPath, '/public')));
 app.use('*', proxy);
 
