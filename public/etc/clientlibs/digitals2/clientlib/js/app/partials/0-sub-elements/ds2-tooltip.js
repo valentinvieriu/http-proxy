@@ -1,0 +1,477 @@
+/**
+ * sub: tooltip
+ * author:  martin, patrick
+ */
+
+(function(window, document, $, undefined) {
+
+  $.widget('digitals2.ds2Tooltip', {
+    options: {
+      topOffset: 16,
+      topOffsetMobileTablet: 28,
+      bottomOffset: 0,
+      bottomOffsetMobileTablet: 8
+    },
+
+    _create: function() {
+
+      var self = this,
+          options = this.options,
+          $element = this.element;
+
+      //ATTENTION: BMWST-3197: on touch devices we need higher buttons and these need a different offset
+      if ($('html').hasClass('touch')) {
+        this.options.topOffset = this.options.topOffsetMobileTablet;
+        this.options.bottomOffset = this.options.bottomOffsetMobileTablet;
+      }
+
+      this.options.dynamicTopOffset = parseInt($element.css('line-height')) || options.topOffset;
+
+      self.iscroll;
+      self.lastPosition = '';
+      self._checkForFullscreen();
+      self._setDeviceValues();
+      self._initTooltips();
+
+      // on resize
+      $(window.digitals2.main).on('ds2ResizeSmall ds2ResizeMedium ds2ResizeLarge', self, self._onResize);
+    },
+
+    _setDeviceValues: function() {
+      var self = this;
+      switch (window.digitals2.main.mediaQueryWatcherCheck()) {
+        case 'ds2ResizeSmall':
+          self.isMobile = true;
+          self.isTablet = false;
+          self.fullscreenMode = true;
+          break;
+        case 'ds2ResizeMedium':
+          self.isTablet = true;
+          self.isMobile = false;
+          self.fullscreenMode = false;
+          break;
+        default:
+          self.isMobile = false;
+          self.isTablet = false;
+          self.fullscreenMode = false;
+          break;
+      }
+    },
+
+    _initTooltips: function() {
+      var self = this,
+          options = this.options,
+          $element = this.element;
+
+
+      var dataTooltipId = $element.data('tooltip-id'),
+          $tooltip = $('.ds2-tooltip-element[data-id="' + dataTooltipId + '"]'),
+          $toolTipContainer = $(document),
+          tooltipPosition = $element.data('position'),
+          tooltipOpenByDefault = $tooltip.data('open-default'),
+          tooltipShowReady = false,
+          tooltipOpenOnClick = $element.data('open-onclick'),
+          tooltipType = $('.ds2-icon', $element).data('tooltip-type'),
+          showObject,
+          hideObject,
+          newMy,
+          newAt,
+          newOffsetY,
+          newOffsetX = (tooltipPosition === 'top-center') ? 0 : 10, // define x offsets
+          newViewport = (tooltipPosition === 'top-center') ? '' : $toolTipContainer, // don't use container for top-center
+          tipOffset;
+
+          if(!tooltipType) {
+            tooltipType = $element.data('tooltipType');
+          }
+
+
+      self.tooltipId = dataTooltipId;
+
+      // define offsets and positions
+      switch (tooltipPosition) {
+        case 'top-center':
+          newMy = 'bottom center';
+          newAt = 'top center';
+          newOffsetY = options.bottomOffset;
+          break;
+        default:
+          switch (tooltipType) {
+            case 'spotlight':
+              newMy = 'center left';
+              newAt = 'center right';
+              newOffsetY = options.bottomOffset;
+              break;
+            case 'needanalyzer-sharing-medium-down':
+              newMy = 'bottom right';
+              newAt = 'top right';
+              newOffsetY = 14;
+              newOffsetX = -15;
+              tipOffset = 15;
+              break;
+            case 'needanalyzer-sharing-large':
+              newMy = 'left top';
+              newAt = 'right top';
+              newOffsetY = 40;
+              tipOffset = 35;
+              break;
+            default:
+              newMy = 'left top';
+              newAt = 'right top';
+              newOffsetY = options.dynamicTopOffset;
+              break;
+          }
+          break;
+      }
+
+      showObject = {
+        solo: true,
+        ready: tooltipShowReady // Show the tooltip when ready
+      };
+
+      hideObject = {
+        event: 'unfocus',
+        fixed: true,
+        delay: 300
+      };
+
+      if (tooltipOpenByDefault) {
+        tooltipShowReady = true;
+        hideObject = {
+          event: 'click'
+        };
+      }
+
+      if (tooltipOpenOnClick || self.fullscreenMode) { // click event on all tooltips when mobile
+        showObject = {
+          solo: true,
+          event: 'click',
+          ready: tooltipShowReady // Show the tooltip when ready
+        };
+      }
+
+      self.content = $tooltip;
+
+      if (tooltipType != 'spotlight' && (!self.isTablet || !self.isMobile)) { // don't init when spotlight and <= tablet
+        $element.qtip({ // Grab some elements to apply the tooltip to
+          overwrite: true,
+          content: {
+            // text: $tooltip.wrapAll('<div>').parent().html() //tooltipContent
+            text: $tooltip //tooltipContent
+          },
+          style: {
+            tip: {
+              corner: true,
+              width: 20,
+              height: 10,
+              offset: tipOffset
+            }
+          },
+          position: {
+            viewport: newViewport,
+            my: newMy,
+            at: newAt,
+            adjust: {
+              y: newOffsetY,
+              x: newOffsetX
+            }
+          },
+          show: showObject,
+          hide: hideObject,
+          events: {
+            show: function(event, api) {
+              $('.qtip').css('opacity', 0);
+              $('.qtip').velocity('stop').velocity({opacity: 1},{duration: 250, complete: function() {
+                $('.qtip').css('opacity', '');
+              }});
+            },
+            move: function(event, api) {
+              var position = api.position.my.x + '_' + api.position.my.y;
+
+              if (self.lastPosition !== position) { //api.cache.posClass) {
+                self.lastPosition = position; //api.cache.posClass;
+                self._repositionTooltipCorner(position);//api.cache.posClass);
+              }
+
+            },
+            hide: function(event, api) {
+              $element.qtip('option', 'show.ready', false);
+              $element.qtip('option', 'hide.fixed', true);
+              $element.qtip('option', 'hide.delay', 300);
+              $('body').removeClass('no-scroll');
+            },
+            visible: function(event, api) {
+              self._checkForFullscreen();
+              if (self.fullscreenMode) { // prevents body scrolling (double scrollbars) on full width tooltips
+                $('body').addClass('no-scroll');
+              }
+              self._buildFullSize($tooltip, self.fullscreenMode); // build fullsize tooltip for mobile
+            }
+          }
+        });
+
+      }
+
+      $('.ds2-tooltip-element--close a, .qtip-close', self.content).unbind().bind('click', $element, self._onCloseClick);
+    },
+
+    _buildFullSize: function(tooltip, fullscreenMode) {
+      var $tooltip = tooltip,
+          $tooltipBody = $('.ds2-tooltip-element--body', $tooltip),
+          $topElement = $('.ds2-tooltip-element--close', $tooltip),
+          $bottomElement = $('.ds2-tooltip-element--footer', $tooltip),
+          offsetTop = $('html').offset().top,
+          offsetBottom = 31, // bottom offset when no buttons are shown
+          viewportHeight = $(window).outerHeight(), // height of viewport
+          topHeight = $topElement.length ? $topElement.outerHeight() : 0, // height of close button
+          bottomHeight = $bottomElement.length ? $bottomElement.outerHeight() : offsetBottom, // height of footer/buttons
+          resultHeight = viewportHeight - (topHeight + bottomHeight); // get the actual height
+
+
+      $tooltip.each(function() {
+        if (fullscreenMode) {
+          $tooltipBody.height(resultHeight);
+          $tooltip.closest('.qtip-default').addClass('qtip-inFullscreenMode');
+        } else {
+          // reset height when resize back to desktop
+          $tooltipBody.height('auto');
+          $tooltip.closest('.qtip-default').removeClass('qtip-inFullscreenMode');
+        }
+      });
+    },
+
+    _repositionTooltipCorner: function(position_) {
+      var self = this,
+          options = self.options,
+          $element = self.element,
+          tooltipType = $element.data('tooltip-type');
+
+
+      setTimeout(function() {
+        switch (position_) {
+          case 'left_top':
+            $element.qtip('option', 'style.tip.mimic', 'left center');
+            $element.qtip('option', 'style.tip.offset', 40);
+            if (tooltipType != 'spotlight') $element.qtip('option', 'position.adjust.y', options.topOffset);
+            if (tooltipType != 'infoIcon') $element.qtip('option', 'position.adjust.y', options.dynamicTopOffset);
+            break;
+          case 'left_bottom':
+            $element.qtip('option', 'style.tip.mimic', 'left center');
+            $element.qtip('option', 'style.tip.offset', 40);
+            $element.qtip('option', 'position.adjust.y', options.bottomOffset);
+            break;
+          case 'right_top':
+            $element.qtip('option', 'style.tip.mimic', 'right center');
+            if (tooltipType != 'needanalyzer-sharing') $element.qtip('option', 'style.tip.offset', 40);
+            if (tooltipType != 'spotlight' && tooltipType != 'needanalyzer-sharing-large') $element.qtip('option', 'position.adjust.y', options.topOffset);
+            if (tooltipType != 'infoIcon' && tooltipType != 'needanalyzer-sharing-large') $element.qtip('option', 'position.adjust.y', options.dynamicTopOffset);
+            if (tooltipType == 'needanalyzer-sharing-large') {
+              $element.qtip('option', 'style.tip.offset', 35);
+              $element.qtip('option', 'position.adjust.y', 40);
+            } 
+
+            break;
+          case 'right_bottom':
+            $element.qtip('option', 'style.tip.mimic', 'bottom center');
+
+            if (tooltipType == 'needanalyzer-sharing-medium-down') {
+              $element.qtip('option', 'position.adjust.y', 14);
+              $element.qtip('option', 'position.adjust.x', -15);
+              $element.qtip('option', 'style.tip.offset', 15);
+            } 
+            // $element.qtip('option', 'style.tip.offset', 15);
+            // $element.qtip('option', 'position.adjust.y', options.bottomOffset);
+            break;
+          case 'left_center':
+          case 'right_center':
+            $element.qtip('option', 'style.tip.mimic', false);
+            $element.qtip('option', 'style.tip.offset', 0);
+            break;
+        }
+      }, 1);
+
+    },
+
+    _createIScroll: function(scrollbar) {
+
+       var self = this,
+          options = this.options,
+          $element = this.element,
+          pTotalHeight = 0,
+          pBodyHeight = $('.ds2-tooltip-element--body', self.content).height(),
+          pMarginTop = 0,
+          pFirstElement = 0;
+
+      $('.ds2-tooltip-element--copy', self.content).attr('id', 'scroll-tooltip-id-' + self.tooltipId);
+
+      if ($('.ds2-tooltip-element--body', self.content) &&
+          $('.ds2-tooltip-element--body', self.content).children().first() &&
+          $('.ds2-tooltip-element--body', self.content).children().first().is('img')) {
+
+        pFirstElement = $('.ds2-tooltip-element--body', self.content).children().first();
+        pTotalHeight = pFirstElement.height();
+      }
+
+      if ($('.ds2-tooltip-element--copy', self.content) &&
+          $('.ds2-tooltip-element--copy', self.content).children().first() &&
+          $('.ds2-tooltip-element--copy', self.content).children().first().css('marginTop')) {
+
+        pMarginTop = parseInt($('.ds2-tooltip-element--copy', self.content).children().first().css('marginTop').replace('px', ''));
+      }
+
+      $('.ds2-tooltip-element--copy', self.content).children().first().children().each(function() {
+          pMarginTop = pMarginTop + parseInt($(this).css('marginTop').replace('px', ''));
+          pTotalHeight = pTotalHeight + $(this).height() + parseInt(pMarginTop);
+      });
+
+      if (self.fullscreenMode) {
+        pBodyHeight = $('.ds2-tooltip-element--body', self.content).height();
+        $('.ds2-tooltip-element--copy', self.content).css({height: 0, overflow: 'scroll'});
+        pTotalHeight = $('.ds2-tooltip-element--copy', self.content).prop('scrollHeight');
+        $('.ds2-tooltip-element--copy', self.content).css({height: '100%', overflow: 'hidden'});
+      }
+
+      if ($('.ds2-tooltip-element--copy', self.content).length) {
+        if(pBodyHeight < pTotalHeight) {
+          $('.ds2-tooltip-element--body', self.content).addClass('ds2-iscroll-container');
+          $('.ds2-tooltip-element--copy', self.content).addClass('ds2-iscroll-content');
+
+          self.iscroll =
+              new IScroll('#' + 'scroll-tooltip-id-' + self.tooltipId, {
+                mouseWheel: true,
+                click: true,
+                tap: true,
+                bounce: false,
+                momentum: true,
+                scrollbars: scrollbar,
+                probeType: 1,
+                interactiveScrollbars: true
+              });
+        }
+        else {
+          $('.ds2-tooltip-element--body', self.content).removeClass('ds2-iscroll-container');
+          $('.ds2-tooltip-element--copy', self.content).removeClass('ds2-iscroll-content');
+        }
+      }
+    },
+
+    _checkForFullscreen: function() {
+      var self = this,
+          $element = self.element,
+          tooltipType = $element.data('tooltip-type'),
+          tooltipPosition = $element.data('position'),
+          tooltipType = $element.data('tooltip-type'),
+          dataTooltipId = $element.data('tooltip-id'),
+          $tooltip = $('.ds2-tooltip-element[data-id="' + dataTooltipId + '"]'),
+          documentwidth = $(document).width(),
+          tooltipwidth = $tooltip.width() + 12 + 40, //tooltip width incl paddings and tip
+          elementwidth = $element.width(),
+          elementposition = $element.offset(),
+          elementpositionfromleft = elementposition.left,
+          elementpositionfromright = documentwidth - elementwidth - elementpositionfromleft,
+          elementisleft = false,
+          elementisright = false;
+
+
+      tooltipwidth = (tooltipwidth > 410) ? 410 : tooltipwidth;
+
+      if (tooltipPosition == 'top-center') {
+        tooltipwidth = $tooltip.width() / 2;
+        elementpositionfromleft = elementpositionfromleft + elementwidth / 2;
+        elementpositionfromright = documentwidth - elementpositionfromleft;
+        (elementpositionfromleft > elementpositionfromright) ? elementisright = true : elementisleft = true;
+        tooltipwidth = (tooltipwidth > 205) ? 205 : tooltipwidth;
+      }
+
+      if ((tooltipType != 'spotlight') &&
+        (tooltipPosition != 'top-center') &&
+        (elementpositionfromleft <= tooltipwidth) &&
+        (elementpositionfromright <= tooltipwidth)) {
+        //change tooltip to fullscreen version
+        self.fullscreenMode = true;
+      }
+      else if ((tooltipType != 'spotlight') &&
+        (tooltipPosition == 'top-center') &&
+        ((elementisleft && (elementpositionfromleft <= tooltipwidth)) ||
+          (elementisright && (elementpositionfromright <= tooltipwidth))
+        )) {
+        //change tooltip to fullscreen version
+        self.fullscreenMode = true;
+      }
+      else if (!self.isMobile) {
+        //change tooltip back to left/right version
+        self.fullscreenMode = false;
+      }
+
+      if (self.iscroll) {
+        self.iscroll.destroy();
+        self.iscroll = null;
+      }
+      setTimeout(function() {
+        self._createIScroll(true);
+      }, 50);
+    },
+
+    /*********************************************************
+     *                  EVENT LISTENER                       *
+     * *******************************************************/
+
+    _onCloseClick: function(event) {
+      var tooltip = event.data,
+          pId = $(tooltip).data('tooltip-id'),
+          pTooltips = $("[data-tooltip-id='" + pId + "']");
+
+      event.preventDefault();
+
+      $.each(pTooltips, function() {
+        $('.qtip').velocity('stop').velocity({opacity: 0},{duration: 250, complete: function() {
+          $(this).qtip('hide');
+        }});
+      });
+    },
+
+    _onResize: function(event) {
+      var self = event.data,
+          $element = self.element,
+          dataTooltipId = $element.data('tooltip-id'),
+          tooltipType = $element.data('tooltip-type'),
+          $tooltip = $('.ds2-tooltip-element[data-id="' + dataTooltipId + '"]');
+
+
+      self._setDeviceValues();
+      self._checkForFullscreen();
+
+      if (tooltipType === 'spotlight' && (self.isTablet || self.isMobile)) {
+        $element.qtip('hide');
+      } else {
+        self._buildFullSize($tooltip, self.fullscreenMode);
+      }
+
+      if (tooltipType === 'needanalyzer-sharing-large' && (self.isTablet || self.isMobile)) {
+        $('.ds2-tooltip[data-tooltip-type="needanalyzer-sharing-large"]').qtip('hide');
+      }
+
+      if (tooltipType === 'needanalyzer-sharing-medium-down' && (!self.isTablet && !self.isMobile)) {
+        $('.ds2-tooltip[data-tooltip-type="needanalyzer-sharing-medium-down"]').qtip('hide');
+      }
+      
+
+      if (self.fullscreenMode && $tooltip.closest('.qtip').hasClass('qtip-focus')) { // prevents body scrolling (double scrollbars) on full width tooltips
+        $('body').addClass('no-scroll');
+      }
+      else if ($tooltip.closest('.qtip').hasClass('qtip-focus')) {
+        $('body').removeClass('no-scroll');
+        $element.qtip('reposition');
+      }
+    }
+
+    /*********************************************************
+     *                 EVENT LISTENER END                    *
+     * *******************************************************/
+  });
+
+  $(window).on('initializeComponents', function() {
+    // $('.ds2-tooltip').ds2Tooltip();
+  });
+
+}(window, document, jQuery));

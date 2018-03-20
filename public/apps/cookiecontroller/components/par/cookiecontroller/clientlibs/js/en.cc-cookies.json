@@ -1,0 +1,14 @@
+{
+  "cookies":[
+    {
+      "cookieKey":"consentCookie",
+      "componentTitle":"Cookiecontroller",
+      "description":"This cookie is set when the user accepts cookies.",
+      "expiry":"365",
+      "needsConsent":false,
+      "operational":true
+    }
+  ],
+  "regulation":"OPT_IN",
+  "timestamp":"1418901908245"
+}
