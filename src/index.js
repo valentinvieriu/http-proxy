@@ -8,6 +8,18 @@ const proxy = require('./proxy');
 
 const rootPath = process.cwd();
 const app = express();
+app.use('/de/stream', function(req, res) {
+  setHeaders(res);
+  res.setHeader('Content-Type', 'text/html')
+  fs
+    .createReadStream(
+      path.join(
+        rootPath,
+        '/public/de/home_link_preload_no_nav_critical_css.html'
+      )
+    )
+    .pipe(res);
+});
 app.use(compression());
 app.use(
   express.static(path.join(rootPath, '/public'), {
@@ -18,17 +30,6 @@ app.use(
     }
   })
 );
-app.use('/de/stream', function(req, res) {
-  // setHeaders(res);
-  fs
-    .createReadStream(
-      path.join(
-        rootPath,
-        '/public/de/home_link_preload_no_nav_critical_css.html'
-      )
-    )
-    .pipe(res);
-});
 app.use('*', proxy);
 
 // Setup HTTP/1.x Server
@@ -58,12 +59,15 @@ spdy.createServer(httpsOptions, app).listen(3001, err => {
 function setHeaders(res) {
   // Custom Cache-Control for HTML files
   const linkPreload = [
-    '</etc/clientlibs/digitals2/home.css>; rel=preload; as=style'
+    '</etc/clientlibs/digitals2/home.css>; rel=preload; as=style',
+    // '</etc/clientlibs/digitals2/clientlib/media/fonts/BMWTypeWebBoldAll.20161018.woff2>; rel=preload; as=font',
     // '</content/dam/bmw/marketDE/bmw_de/teaser/large-teaser/18_efficientdynamics_header_1680x756.jpg/_jcr_content/renditions/cq5dam.resized.img.1680.large.time1520604709705.jpg>; rel=preload; as=image',
     // '</etc/clientlibs/digitals2/ltr+requests.min.20180223082733.min.css>; rel=preload; as=style',
     // '</etc/clientlibs/digitals2/clientlib/api.min.20180216002220.min.js>; rel=preload; as=script',
     // '</etc/clientlibs/digitals2/clientlib/base.min.20180216002220.min.js>; rel=preload; as=script'
   ];
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  // res.setHeader('Content-Encoding', 'gzip');
   res.setHeader('Cache-Control', 'public, max-age=0');
   res.setHeader('Link', linkPreload.join(','));
 }
