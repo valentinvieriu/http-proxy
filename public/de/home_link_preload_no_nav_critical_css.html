@@ -4471,6 +4471,15 @@
     <script type="text/javascript" defer async src="//bmw.scene7.com/s7viewers/html5/js/VideoViewer.js"c></script>
 
     <!--googleon: all-->
+<script>
+    // Check that service workers are registered
+    if ('serviceWorker' in navigator) {
+        // Use the window load event to keep the page load performant
+        window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/de/sw-cats.js');
+        });
+    }
+</script>
 </body>
 
 </html>
